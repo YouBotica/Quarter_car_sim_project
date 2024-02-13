@@ -81,26 +81,26 @@ hold off;
 
 % Mathematical model:
 
-A_qc = [ 
+A_sus = [ 
      0,  1,  0,  0;
-    -Ks/ms, -Cs_optimal/ms,  Ks/ms,  Cs_optimal/ms;
+    -Ks/ms, -Cs/ms,  Ks/ms,  Cs/ms;
      0,   0,   0,   1;
-     Ks/mu,  Cs_optimal/mu,  -(Ks+Kt)/mu,  -(Cs_optimal+Ct)/mu];
+     Ks/mu,  Cs/mu,  -(Ks+Kt)/mu,  -(Cs+Ct)/mu];
  
-B_qc = [
+B_sus = [
     0, 0;
     0, 0;
     0, 0;
     Kt/mu, Ct/mu];
  
-C_qc = [
+C_sus = [
     1, 0, 0, 0;
     0, 0, 1, 0];
  
-D_qc = [
+D_sus = [
     0, 0;0, 0];
 
-bode(ss(A_qc, B_qc(:,1), C_qc(2,:), D_qc(1,1)));
+
 
 
 %% Functions:
