@@ -1,4 +1,4 @@
-%% Simulation 1:
+%% Test model for simulation 1:
 
 % Parameters:
 
@@ -11,23 +11,15 @@ Ct = 0.01; % lbs-sec/in
 g = 386.06; % in/sec^2
 
 ms = Ws / g; % Sprung mass lbs*sec^2/in
-mu = Wu / g; % Unsprung mass in lbs*sec^2/in
-
-freq_low_bound = 4*2*pi; % 4 Hz = 25.13 rad/sec
-freq_up_bound = 8*2*pi; % 8 Hz = 50.27 rad / sec
+mu = Ws / g; % Unsprung mass in lbs*sec^2/in
 
 
 Cs_array = logspace(log10(0.1), log10(100), 10); % In lbs/in/sec
 
-% TODO: Insert an optimization algorithm here instead:
-
-% x = fmincon(fun,x0,A,b)
-% x = fmincon(fun,x0,A,b,Aeq,beq)
-
-
 % Legend arrays:
 legendEntries = cell(1, 2*length(Cs_array)); % Initialize the cell array
 legendCounter = 1; % Initialize a counter for legend entries
+
 
 figure; % Create the first figure outside the loop
 xscale log;
@@ -41,6 +33,7 @@ for i=1:length(Cs_array)
     % plot:
     % subplot(2,1,1);
     [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
+
     semilogx(w, mgs, 'o-'); % Plot the magnitude vs frequency for the sprung mass
     legendEntries{legendCounter} = sprintf('Sprung mass Cs = %.2f, Ct = %.2f', Cs, Ct);
     legendCounter = legendCounter + 1;
@@ -49,34 +42,18 @@ for i=1:length(Cs_array)
     legendEntries{legendCounter} = sprintf('Unsprung mass Cs = %.2f, Ct = %.2f', Cs, Ct);
     legendCounter = legendCounter + 1;
 
+    human_sensitivity = power(10,4/20)*ones(length(w), 1);
+    semilogx(w, human_sensitivity, '--', LineWidth=2)
+
 end
 
 
 title('Relative damping transmissibility plot varying Cs');
 legend(legendEntries{1:2*length(Cs_array)}); % Create the legend for the first figure
-human_sensitivity = power(10,4/20)*ones(length(w), 1);
-semilogx(w, human_sensitivity, '--', LineWidth=2)
 xlabel('frequency [rad/sec]');
 ylabel('amplitude ratio');
-xline(freq_low_bound);
-xline(freq_up_bound);
 hold off;
 
-%% Damper selection:
-figure; 
-xscale log;
-grid on;
-hold on;
-
-Cs = 21;
-[mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
-
-semilogx(w, mgs, 'o-'); % Plot the magnitude vs frequency for the sprung mass
-hold on;
-semilogx(w, mgu, '--'); % Plot the magnitude vs frequency for the unsprung mass
-
-
-%%
 
 function [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
 
