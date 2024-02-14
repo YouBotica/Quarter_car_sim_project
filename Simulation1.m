@@ -66,7 +66,7 @@ legendEntries{legendCounter} = sprintf('Unsprung mass transm. for selected opt. 
 legendCounter = legendCounter + 1;
 
 
-title('Relative damping transmissibility plot varying Cs');
+title('Relative damping transmissibility plot varying Cs');= 
 legend(legendEntries{1:2*length(Cs_array) + 2}); % Create the legend for the first figure
 human_sensitivity = power(10,4/20)*ones(length(w), 1);
 semilogx(w, human_sensitivity, '--', LineWidth=2)
@@ -81,11 +81,13 @@ hold off;
 
 % Mathematical model:
 
+Cs = Cs_optimal;
+
 A_qc = [ 
      0,  1,  0,  0;
-    -Ks/ms, -Cs_optimal/ms,  Ks/ms,  Cs_optimal/ms;
+    -Ks/ms, -Cs/ms,  Ks/ms,  Cs/ms;
      0,   0,   0,   1;
-     Ks/mu,  Cs_optimal/mu,  -(Ks+Kt)/mu,  -(Cs_optimal+Ct)/mu];
+     Ks/mu,  Cs/mu,  -(Ks+Kt)/mu,  -(Cs+Ct)/mu];
  
 B_qc = [
     0, 0;
@@ -100,7 +102,35 @@ C_qc = [
 D_qc = [
     0, 0;0, 0];
 
-bode(ss(A_qc, B_qc(:,1), C_qc(2,:), D_qc(1,1)));
+% Assuming the optimal damper value and other parameters are defined
+% Generate the state-space model
+sys_qc = ss(A_qc, B_qc(:,1), C_qc(2,:), D_qc(1,1));
+
+figure;
+[mag, phase, wout] = bode(sys_qc);
+magdB = 20*log10(mag); % Convert magnitude to dB
+
+h = bodeplot(sys_qc);
+
+%% Isolation function:
+
+C_isolation = [0, 1, 0, 0];
+
+% Bode:
+figure;
+hold on;
+xscale log;
+[mag, phase, wout] = bode(sys_qc);
+magdB = 20*log10(mag); % Convert magnitude to dB
+
+semilogx(squeeze(wout), squeeze(magdB), 'o-', LineWidth=3.0); % Plot the magnitude vs frequency for the sprung mass
+yline(4);
+xline(freq_low_bound);
+xline(freq_up_bound);
+
+
+%% 
+
 
 
 %% Functions:
@@ -123,9 +153,9 @@ function cost = objectiveFunction(Cs)
     % Assume twomass_rel_damp is modified to accept Cs and return a cost metric
     [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
 
-    % Cost is formulated here as the max amplitude in the 4-8 Hz range
-    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); % rad/sec
-    relevantIndices2 = (w >= 4) & (w <= 8); % More or less here is where the ride natural frequency occurs
+    % Cost function formulation:
+    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); % rad/sec for the 4 to 8 Hz region % TODO: Might need to add human sensitivity here
+    relevantIndices2 = (w >= 4) & (w <= 8); % More or less within this range is where the ride natural frequency occurs
     cost = mean(mgs(relevantIndices)) + mean(mgs(relevantIndices2)); %max(mgs(relevantIndices));
 end
 
@@ -133,7 +163,6 @@ end
 function [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
 
     % Mathematical model:
-    
     A=[ 0,  1,  0,  0;
         -Ks/ms, -Cs/ms,  Ks/ms,  Cs/ms;
          0,   0,   0,   1;
