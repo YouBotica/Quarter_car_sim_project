@@ -66,7 +66,7 @@ legendEntries{legendCounter} = sprintf('Unsprung mass transm. for selected opt. 
 legendCounter = legendCounter + 1;
 
 
-title('Relative damping transmissibility plot varying Cs');= 
+title('Relative damping transmissibility plot varying Cs');
 legend(legendEntries{1:2*length(Cs_array) + 2}); % Create the legend for the first figure
 human_sensitivity = power(10,4/20)*ones(length(w), 1);
 semilogx(w, human_sensitivity, '--', LineWidth=2)
@@ -104,13 +104,14 @@ D_qc = [
 
 % Assuming the optimal damper value and other parameters are defined
 % Generate the state-space model
-sys_qc = ss(A_qc, B_qc(:,1), C_qc(2,:), D_qc(1,1));
-
 figure;
-[mag, phase, wout] = bode(sys_qc);
-magdB = 20*log10(mag); % Convert magnitude to dB
-
-h = bodeplot(sys_qc);
+sys_qc = ss(A_qc, B_qc(:,1), C_qc(1,:), D_qc(1,1));
+bode(sys_qc);
+% figure;
+% [mag, phase, wout] = bode(sys_qc);
+% magdB = 20*log10(mag); % Convert magnitude to dB
+% 
+% h = bodeplot(sys_qc);
 
 %% Isolation function:
 
@@ -129,11 +130,77 @@ xline(freq_low_bound);
 xline(freq_up_bound);
 
 
-%% 
+%% Time domain simulation:
+t_initial = 0; t_final = 10;
+dt = 0.01; % 100 Hz
+steps = (t_final - t_initial) / dt;
+time_space = linspace(t_initial, t_final, steps);
 
+% Create an input that has one inch step at 0.5 Hz:
+amplitude = 1; % inch
+freq_hz = 1;
+road_freq = freq_hz*2*pi;
+period = 1 / road_freq;
+road_input = amplitude*sin(road_freq*time_space).*ones(1, steps);
+
+% zero_indices = road_input < 0;
+% one_indices = road_input >= 0;
+
+% road_input(zero_indices) = 0;
+% road_input(one_indices) = 1;
+
+x_initial = zeros(4,1);
+x = zeros(4,1);
+
+% Parameters:
+params = struct('Ks', Ks, 'Kt', Kt, 'Ws', Ws, 'Wu', Wu, 'Ct', Ct, 'Cs', Cs_optimal, 'g', g, 'ms', ms, 'mu', mu);
+
+% Start loop:
+x_array = qc_time_simulation(t_initial, x_initial, steps, dt, road_input, params);
+
+% Plot x_s:
+plot(time_space, x_array(1, :)); 
+hold on;
+plot(time_space, road_input);
+hold off;
 
 
 %% Functions:
+
+function [x_array] = qc_time_simulation(t0, x0, steps, dt, road_input, params)
+    
+    Ks = params.Ks;
+    ms = params.ms;
+    Cs = params.Cs;
+    mu = params.mu;
+    Kt = params.Kt;
+    Ct = params.Ct;
+
+    t = t0; 
+    x_array = zeros(4, steps); % 4 rows, steps columns to store the time simulation states over time
+    x = x0;
+
+    A = [ 
+         0,  1,  0,  0;
+        -Ks/ms, -Cs/ms,  Ks/ms,  Cs/ms;
+         0,   0,   0,   1;
+         Ks/mu,  Cs/mu,  -(Ks+Kt)/mu,  -(Cs+Ct)/mu];
+     
+    B = [
+        0, 0;
+        0, 0;
+        0, 0;
+        Kt/mu, Ct/mu];
+
+
+    for iter = 1:steps
+        dx = A*x + B(:,1)*road_input(iter);
+        x_array(:, iter) = x;
+        x = x + dx*dt;
+        t = t + dt;
+    end
+
+end
 
 % Objective function that the optimization algorithm will minimize
 function cost = objectiveFunction(Cs)

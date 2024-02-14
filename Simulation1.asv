@@ -81,29 +81,93 @@ hold off;
 
 % Mathematical model:
 
-A_sus = [ 
+Cs = Cs_optimal;
+
+A_qc = [ 
      0,  1,  0,  0;
     -Ks/ms, -Cs/ms,  Ks/ms,  Cs/ms;
      0,   0,   0,   1;
      Ks/mu,  Cs/mu,  -(Ks+Kt)/mu,  -(Cs+Ct)/mu];
  
-B_sus = [
+B_qc = [
     0, 0;
     0, 0;
     0, 0;
     Kt/mu, Ct/mu];
  
-C_sus = [
+C_qc = [
     1, 0, 0, 0;
     0, 0, 1, 0];
  
-D_sus = [
+D_qc = [
     0, 0;0, 0];
 
+% Assuming the optimal damper value and other parameters are defined
+% Generate the state-space model
+sys_qc = ss(A_qc, B_qc(:,1), C_qc(1,:), D_qc(1,1));
+bode(sys_qc);
+% figure;
+% [mag, phase, wout] = bode(sys_qc);
+% magdB = 20*log10(mag); % Convert magnitude to dB
+% 
+% h = bodeplot(sys_qc);
+
+%% Isolation function:
+
+C_isolation = [0, 1, 0, 0];
+
+% Bode:
+figure;
+hold on;
+xscale log;
+[mag, phase, wout] = bode(sys_qc);
+magdB = 20*log10(mag); % Convert magnitude to dB
+
+semilogx(squeeze(wout), squeeze(magdB), 'o-', LineWidth=3.0); % Plot the magnitude vs frequency for the sprung mass
+yline(4);
+xline(freq_low_bound);
+xline(freq_up_bound);
+
+
+%% Time domain simulation:
+t_initial = 0; t_final = 10;
+dt = 0.01; % 100 Hz
+steps = (t_final - t_initial) / dt;
+time_space = linspace(t_initial, t_final, steps);
+
+% Create an input that has one inch step at 0.5 Hz:
+amplitude = 1; % inch
+road_freq = 0.5*2*pi;
+period = 1 / road_freq;
+road_input = amplitude*sin(road_freq*time_space).*ones(1, steps);
+
+zero_indices = road_input < 0;
+one_indices = road_input >= 0;
+
+road_input(zero_indices) = 0;
+road_input(one_indices) = 1;
+
+x_initial = zeros(4,1);
+x = zeros(4,1);
+
+% Start loop:
+t = t_initial; 
+x_array = zeros(4, steps); % 4 rows, steps columns to store the time simulation states over time
+
+for iter = 1:steps
+    dx = A_qc*x + B_qc(:,1)*road_input(iter);
+    x_array(:, iter) = x;
+    x = x + dx*dt;
+    t = t + dt;
+end
 
 
 
 %% Functions:
+
+function [x_array, ] = qc_time_simulation(t0, steps, dt, A, B, x_init)
+    x 
+end
 
 % Objective function that the optimization algorithm will minimize
 function cost = objectiveFunction(Cs)
@@ -123,9 +187,9 @@ function cost = objectiveFunction(Cs)
     % Assume twomass_rel_damp is modified to accept Cs and return a cost metric
     [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
 
-    % Cost is formulated here as the max amplitude in the 4-8 Hz range
-    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); % rad/sec
-    relevantIndices2 = (w >= 4) & (w <= 8); % More or less here is where the ride natural frequency occurs
+    % Cost function formulation:
+    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); % rad/sec for the 4 to 8 Hz region % TODO: Might need to add human sensitivity here
+    relevantIndices2 = (w >= 4) & (w <= 8); % More or less within this range is where the ride natural frequency occurs
     cost = mean(mgs(relevantIndices)) + mean(mgs(relevantIndices2)); %max(mgs(relevantIndices));
 end
 
@@ -133,7 +197,6 @@ end
 function [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
 
     % Mathematical model:
-    
     A=[ 0,  1,  0,  0;
         -Ks/ms, -Cs/ms,  Ks/ms,  Cs/ms;
          0,   0,   0,   1;
