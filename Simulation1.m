@@ -13,16 +13,27 @@ g = 386.06; % in/sec^2
 ms = Ws / g; % Sprung mass lbs*sec^2/in
 mu = Wu / g; % Unsprung mass in lbs*sec^2/in
 
-freq_low_bound = 4*2*pi; % 4 Hz = 25.13 rad/sec
+freq_low_bound = 4*2*pi; % 4 Hz = 25.13 rad / sec
 freq_up_bound = 8*2*pi; % 8 Hz = 50.27 rad / sec
 
 Cs_array = logspace(log10(0.1), log10(100), 10); % In lbs/in/sec
 
 % Legend arrays:
-legendEntries = cell(1, 2*length(Cs_array) + 2); % Initialize the cell array
-legendCounter = 1; % Initialize a counter for legend entries
+legendEntriesTop = cell(1, 2*length(Cs_array) + 2); % Initialize the cell array
+legendCounterTop = 1; % Initialize a counter for legend entries
+
+legendEntriesBottom = cell(1, length(Cs_array) + 1); % Initialize the cell array
+legendCounterBottom = 1; % Initialize a counter for legend entries
+
 
 figure(1); % Create the first figure outside the loop
+
+subplot(2,1,1);
+xscale log;
+grid on;
+hold on;
+
+subplot(2,1,2);
 xscale log;
 grid on;
 hold on;
@@ -32,49 +43,70 @@ for i=1:length(Cs_array)
     Cs = Cs_array(i);
 
     % plot:
-    % subplot(2,1,1);
-    [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
-    semilogx(w, mgs, 'o-'); % Plot the magnitude vs frequency for the sprung mass
-    legendEntries{legendCounter} = sprintf('Sprung mass Cs = %.2f, Ct = %.2f', Cs, Ct);
-    legendCounter = legendCounter + 1;
+    subplot(2,1,1);
+    [mag_sprung, mag_unsprung, mag_isolation, w1, w2] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
+    semilogx(w1, mag_sprung, 'o-'); % Plot the magnitude vs frequency for the sprung mass
+    legendEntriesTop{legendCounterTop} = sprintf('Sprung mass Cs = %.2f, Ct = %.2f', Cs, Ct);
+    legendCounterTop = legendCounterTop + 1;
 
-    semilogx(w, mgu, '--'); % Plot the magnitude vs frequency for the unsprung mass
-    legendEntries{legendCounter} = sprintf('Unsprung mass Cs = %.2f, Ct = %.2f', Cs, Ct);
-    legendCounter = legendCounter + 1;
+    semilogx(w1, mag_unsprung, '--'); % Plot the magnitude vs frequency for the unsprung mass
+    legendEntriesTop{legendCounterTop} = sprintf('Unsprung mass Cs = %.2f, Ct = %.2f', Cs, Ct);
+    legendCounterTop = legendCounterTop + 1;
+
+    % plot:
+    subplot(2,1,2);
+    semilogx(w2, mag_isolation, '--'); % Plot the magnitude vs frequency for the unsprung mass
+    legendEntriesBottom{legendCounterBottom} = sprintf('Sprung mass accel Cs = %.2f, Ct = %.2f', Cs, Ct);
+    legendCounterBottom = legendCounterBottom + 1;
 
 end
 
 % Initial guess for Cs
-Cs_initial = 3.0; % Starting point for the search
+Cs_initial = 40.0; % Starting point for the search
 
 options = optimoptions('fmincon','Display','iter','Algorithm','sqp'); % FIXME: Use me
 
 A = []; b = []; Aeq = []; Beq = []; lb = 1.0; ub = 100;
 [Cs_optimal, cost_optimal] = fmincon(@objectiveFunction, Cs_initial, A, b, Aeq, Beq, lb, ub); % TODO: Add options to show optimization by iter
 
-% Output the optimal Cs
+% Print the optimal Cs
 fprintf('Optimal Cs: %f, with a cost of %f\n', Cs_optimal, cost_optimal);
 
+% Generate frequency responses:
+[mag_sprung, mag_unsprung, mag_isolation, w1, w2] = twomass_rel_damp(Ks, Kt, Cs_optimal, Ct, ms, mu);
 
-[mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs_optimal, Ct, ms, mu);
-semilogx(w, mgs, 'o-', LineWidth=3.0); % Plot the magnitude vs frequency for the sprung mass
-legendEntries{legendCounter} = sprintf('Sprung mass transm. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs, Ct);
-legendCounter = legendCounter + 1;
+subplot(2, 1, 1); % Top plot
+semilogx(w1, mag_sprung, 'o-', LineWidth=3.0); % Plot the magnitude vs frequency for the sprung mass
+legendEntriesTop{legendCounterTop} = sprintf('Sprung mass transm. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs_optimal, Ct);
+legendCounterTop = legendCounterTop + 1;
 
-semilogx(w, mgu, '--', LineWidth=3.0); % Plot the magnitude vs frequency for the unsprung mass
-legendEntries{legendCounter} = sprintf('Unsprung mass transm. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs, Ct);
-legendCounter = legendCounter + 1;
-
+semilogx(w1, mag_unsprung, '--', LineWidth=3.0); % Plot the magnitude vs frequency for the unsprung mass
+legendEntriesTop{legendCounterTop} = sprintf('Unsprung mass transm. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs_optimal, Ct);
+legendCounterTop = legendCounterTop + 1;
 
 title('Relative damping transmissibility plot varying Cs');
-legend(legendEntries{1:2*length(Cs_array) + 2}); % Create the legend for the first figure
-human_sensitivity = power(10,4/20)*ones(length(w), 1);
-semilogx(w, human_sensitivity, '--', LineWidth=2)
+legend(legendEntriesTop{1:2*length(Cs_array) + 2}); % Create the legend for the first figure
+% semilogx(w, human_sensitivity, '--', LineWidth=2)
 xlabel('frequency [rad/sec]');
 ylabel('amplitude ratio');
-xline(freq_low_bound);
-xline(freq_up_bound);
 hold off;
+
+
+subplot(2, 1, 2); % Bottom plot
+semilogx(w2, mag_isolation, 'o-', LineWidth=3.0); % Plot the magnitude vs frequency for the sprung mass
+legendEntriesBottom{legendCounterBottom} = sprintf('Sprung mass isolation func. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs_optimal, Ct);
+legendCounterBottom = legendCounterBottom + 1;
+
+title('Relative damping isolation function plot varying Cs');
+legend(legendEntriesBottom{1:length(Cs_array) + 1}); % Create the legend for the first figure
+% semilogx(w, human_sensitivity, '--', LineWidth=2)
+xlabel('frequency [rad/sec]');
+ylabel('amplitude ratio');
+hold off;
+
+
+% human_sensitivity = power(10,4/20)*ones(length(w), 1);
+
 
 %% The system with the optimal damper is loaded as a state-space in Matlab for
 % Bode plots:
@@ -138,7 +170,7 @@ time_space = linspace(t_initial, t_final, steps);
 
 % Create an input that has one inch step at 0.5 Hz:
 amplitude = 1; % inch
-freq_hz = 1;
+freq_hz = 0.5;
 road_freq = freq_hz*2*pi;
 period = 1 / road_freq;
 road_input = amplitude*sin(road_freq*time_space).*ones(1, steps);
@@ -163,6 +195,10 @@ plot(time_space, x_array(1, :));
 hold on;
 plot(time_space, road_input);
 hold off;
+
+%% Non-linear damper selection:
+
+
 
 
 %% Functions:
@@ -218,16 +254,16 @@ function cost = objectiveFunction(Cs)
     mu = Wu / g; % Unsprung mass in lbs*sec^2/in
 
     % Assume twomass_rel_damp is modified to accept Cs and return a cost metric
-    [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
-
+    [mgs_sus, mgu_sus, mag_iso, w1, w2] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
+    
     % Cost function formulation:
-    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); % rad/sec for the 4 to 8 Hz region % TODO: Might need to add human sensitivity here
-    relevantIndices2 = (w >= 4) & (w <= 8); % More or less within this range is where the ride natural frequency occurs
-    cost = mean(mgs(relevantIndices)) + mean(mgs(relevantIndices2)); %max(mgs(relevantIndices));
+    relevantIndices = (w1 >= 4*2*pi) & (w1 < 8*2*pi); % rad/sec for the 4 to 8 Hz region % TODO: Might need to add human sensitivity here
+    relevantIndices2 = (w1 >= 4) & (w1 < 8); % (rad/sec) More or less within this range is where the ride natural frequency occurs
+    cost = mean(mgs_sus(relevantIndices)) + mean(mgu_sus(relevantIndices2)); %max(mgs(relevantIndices));
 end
 
 
-function [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
+function [mgs_sus, mgu_sus, mgs_iso, w1, w2] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
 
     % Mathematical model:
     A=[ 0,  1,  0,  0;
@@ -240,17 +276,25 @@ function [mgs, mgu, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
         0, 0;
         Kt/mu, Ct/mu];
      
-    C=[1, 0, 0, 0;
-        0, 0, 1, 0];
-     
-    D=[0, 0;0, 0];
+    % C=[1, 0, 0, 0;
+    %     0, 0, 1, 0];
 
-    %twomass calculates the frequency response of a two-mass
-    [mag, phase, w]=bode(ss(A,B(:,1),C(1,:),[0]),logspace(0,3)); % Outputs Xs
-     mgs(1:50)=mag;
+    C = eye(4);
      
-    [mag, phase, w]=bode(ss(A,B(:,1),C(2,:),[0]),logspace(0,3)); % Outputs Xu
-    mgu(1:50)=mag;
+    D=[0, 0; 0, 0];
+
+    % Generate frequency responses:
+
+    % Bode from road displacement to sprung mass displacement:
+    [mag_sprung_sus, phase, w1] = bode(ss(A, B(:,1), [1, 0, 0, 0], D(1,1)), logspace(0,3)); % Outputs Xs
+    mgs_sus(1:50) = mag_sprung_sus;
+
+    % Bode from road displacement to usprung mass displacement:
+    [mag_unsprung_sus, phase, w1] = bode(ss(A, B(:,1), [0, 0, 1, 0], D(1,1)), logspace(0,3)); % Outputs Xu
+    mgu_sus(1:50) = mag_unsprung_sus;
+    
+    % Bode from road input velocity to sprung mass acceleration (isolation function):
+    [mag_iso, phase, w2] = bode(ss(A, B(:,1), [0, 1, 0, 0], D(1,1)), logspace(0,3)); % Outputs Xu
+    mgs_iso(1:50) = mag_iso;
 end
-
 
