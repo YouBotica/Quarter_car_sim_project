@@ -90,7 +90,7 @@ hold off;
 
 subplot(2, 1, 2);
 semilogx(w, mg_iso_db, '--', LineWidth=3.0); % Plot the magnitude vs frequency for the unsprung mass
-legendEntriesBottom{legendCounterBottom} = sprintf('Sprung mass isolatrion func. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs_optimal, Ct);
+legendEntriesBottom{legendCounterBottom} = sprintf('Sprung mass isolation func. for selected opt. damper Cs = %.2f, Ct = %.2f', Cs_optimal, Ct);
 legendCounterBottom = legendCounterBottom + 1;
 
 human_sensitivity = 4*ones(length(w), 1);
@@ -99,8 +99,8 @@ legendEntriesBottom{legendCounterBottom} = sprintf('Human sensitivity');
 legend(legendEntriesBottom{:}); % Create the legend for the first figure
 xline(freq_low_bound);
 xline(freq_up_bound);
+ylabel('magnitude (dB)')
 hold off;
-
 
 
 %% The system with the optimal damper is loaded as a state-space in Matlab for
@@ -156,10 +156,6 @@ xline(freq_low_bound);
 xline(freq_up_bound);
 
 
-%% 
-
-
-
 %% Functions:
 
 % Objective function that the optimization algorithm will minimize
@@ -179,11 +175,12 @@ function cost = objectiveFunction(Cs)
 
     % Assume twomass_rel_damp is modified to accept Cs and return a cost metric
     [mgs, mgu, mg_iso, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu);
-
+    mg_iso_db = 20*log(mg_iso);
     % Cost function formulation:
-    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); % rad/sec for the 4 to 8 Hz region % TODO: Might need to add human sensitivity here
-    relevantIndices2 = (w >= 4) & (w <= 8); % More or less within this range is where the ride natural frequency occurs
-    cost = mean(mgs(relevantIndices)) + mean(mgs(relevantIndices2)); %max(mgs(relevantIndices));
+    relevantIndices = (w >= 4*2*pi) & (w <= 8*2*pi); 
+    relevantIndices2 = (w >= 4) & (w <= 8);
+    cost = mean(mgs(relevantIndices)) + 10*mean(mgs(relevantIndices2) + 0.05*mean(abs(mg_iso(relevantIndices))));
+    % cost = mean(mg_iso(relevantIndices)); %max(mgs(relevantIndices));
 end
 
 
@@ -206,10 +203,10 @@ function [mgs, mgu, mg_iso, w] = twomass_rel_damp(Ks, Kt, Cs, Ct, ms, mu)
     D=[0, 0;0, 0];
 
     %twomass calculates the frequency response of a two-mass
-    [mag, phase, w]=bode(ss(A,B(:,1),C(1,:), [0]),logspace(0,3)); % Outputs Xs
+    [mag, phase, w]=bode(ss(A,B(:,1), C(1,:), [0]),logspace(0,3)); % Outputs Xs
      mgs(1:50)=mag;
      
-    [mag, phase, w]=bode(ss(A,B(:,1),C(2,:), [0]),logspace(0,3)); % Outputs Xu
+    [mag, phase, w]=bode(ss(A,B(:,1), C(2,:), [0]),logspace(0,3)); % Outputs Xu
     mgu(1:50)=mag;
 
     [mag, phase, w]=bode(ss(A,B(:,1), [0, 1, 0, 0], [0]),logspace(0,3)); % Outputs Xu
